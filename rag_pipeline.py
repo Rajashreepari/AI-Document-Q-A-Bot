@@ -78,7 +78,7 @@ class RAGPipeline:
         2. query()            → embed query, retrieve top-K chunks, generate answer
     """
 
-    EMBED_MODEL = "models/embedding-001"
+    EMBED_MODEL = "models/text-embedding-004"
     COLLECTION  = "docmind_collection"
 
     def __init__(
