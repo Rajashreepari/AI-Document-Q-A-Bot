@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import uuid
 import re
 from pathlib import Path
@@ -13,23 +12,20 @@ from google.genai import types
 
 
 def _extract_text_from_pdf(pdf_path: str) -> str:
-    try:
-        import fitz
-        doc = fitz.open(pdf_path)
-        pages = []
-        for page in doc:
-            pages.append(page.get_text("text"))
-        doc.close()
-        return "\n\n".join(pages)
-    except ImportError:
-        raise ImportError("PyMuPDF is not installed. Run: pip install pymupdf")
+    import fitz
+    doc = fitz.open(pdf_path)
+    pages = []
+    for page in doc:
+        pages.append(page.get_text("text"))
+    doc.close()
+    return "\n\n".join(pages)
 
 
 def _chunk_text(text: str, chunk_size: int = 512, overlap: int = 64) -> list[str]:
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     sentences = re.split(r"(?<=[.!?])\s+", text)
-    chunks: list[str] = []
-    current_words: list[str] = []
+    chunks = []
+    current_words = []
     current_count = 0
 
     for sentence in sentences:
@@ -51,6 +47,7 @@ def _chunk_text(text: str, chunk_size: int = 512, overlap: int = 64) -> list[str
 
 class RAGPipeline:
 
+    EMBED_MODEL = "models/gemini-embedding-001"
     COLLECTION = "docmind_collection"
 
     def __init__(
@@ -65,8 +62,8 @@ class RAGPipeline:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
-        genai.configure(api_key=gemini_api_key)
-        self.llm = genai.GenerativeModel(model_name)
+        self.client = genai.Client(api_key=gemini_api_key)
+        self.llm_model = model_name
 
         self._chroma = chromadb.Client(Settings(anonymized_telemetry=False))
 
@@ -87,7 +84,10 @@ class RAGPipeline:
             raw_text = _extract_text_from_pdf(path)
             chunks = _chunk_text(raw_text, self.chunk_size, self.chunk_overlap)
 
-            documents, embeddings, metadatas, ids = [], [], [], []
+            documents = []
+            embeddings = []
+            metadatas = []
+            ids = []
 
             for idx, chunk in enumerate(chunks):
                 if not chunk.strip():
@@ -141,7 +141,7 @@ class RAGPipeline:
 
         prompt = f"""You are DocMind, an expert document assistant.
 Answer the user's question using ONLY the context provided below.
-If the answer is not in the context, say: "I couldn't find relevant information in the uploaded documents."
+If the answer is not in the context, say: I could not find relevant information in the uploaded documents.
 Be concise, accurate, and cite the source document when possible.
 
 CONTEXT:
@@ -152,7 +152,10 @@ QUESTION:
 
 ANSWER:"""
 
-        response = self.llm.generate_content(prompt)
+        response = self.client.models.generate_content(
+            model=self.llm_model,
+            contents=prompt,
+        )
         answer = response.text.strip()
 
         return {
@@ -162,9 +165,8 @@ ANSWER:"""
         }
 
     def _embed(self, text: str) -> list[float]:
-    result = genai.embed_content(
-        model="models/gemini-embedding-001",
-        content=text,
-        task_type="retrieval_document",
-    )
-    return result["embedding"]
+        result = self.client.models.embed_content(
+            model=self.EMBED_MODEL,
+            contents=text,
+        )
+        return result.embeddings[0].values
