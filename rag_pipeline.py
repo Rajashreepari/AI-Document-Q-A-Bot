@@ -209,10 +209,18 @@ ANSWER:"""
     # ── Embedding Helper ───────────────────────────────────────────────────
 
     def _embed(self, text: str) -> list[float]:
-        """Generate embedding vector using Gemini embedding model."""
+    #Generate embedding vector using Gemini embedding model.
+    try:
         result = genai.embed_content(
-            model=self.EMBED_MODEL,
+            model="models/text-embedding-004",
             content=text,
             task_type="retrieval_document",
+        )
+        return result["embedding"]
+    except Exception:
+        # Fallback to older model
+        result = genai.embed_content(
+            model="models/embedding-001",
+            content=text,
         )
         return result["embedding"]
