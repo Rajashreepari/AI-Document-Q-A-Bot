@@ -8,7 +8,8 @@ from typing import Any
 
 import chromadb
 from chromadb.config import Settings
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 
 def _extract_text_from_pdf(pdf_path: str) -> str:
@@ -161,16 +162,9 @@ ANSWER:"""
         }
 
     def _embed(self, text: str) -> list[float]:
-        try:
-            result = genai.embed_content(
-                model="models/text-embedding-004",
-                content=text,
-                task_type="retrieval_document",
-            )
-            return result["embedding"]
-        except Exception:
-            result = genai.embed_content(
-                model="models/embedding-001",
-                content=text,
-            )
-            return result["embedding"]
+    result = genai.embed_content(
+        model="models/gemini-embedding-001",
+        content=text,
+        task_type="retrieval_document",
+    )
+    return result["embedding"]
